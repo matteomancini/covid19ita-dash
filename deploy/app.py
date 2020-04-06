@@ -2,13 +2,14 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_table
-import plotly.graph_objects as go
+import plotly.express as px
 from dash.dependencies import Input, Output, State
 
 import json
 import pandas as pd
 import numpy as np
 from urllib.request import urlopen
+from shapely import geometry
 
 app = dash.Dash(__name__)
 
@@ -21,6 +22,17 @@ with urlopen(geojson_url) as response:
     prov = json.load(response)
 
 data = pd.read_csv(dataset_url)
+
+prov_coords={}
+for n,p in enumerate(prov['features']):
+    prov_code = p['properties']['prov_istat_code_num']
+    if len(p['geometry']['coordinates'][0])>4:
+        pts = p['geometry']['coordinates'][0]
+    else:
+        pts = p['geometry']['coordinates'][0][0]
+    coords = [c[0] for c in geometry.Polygon(pts).centroid.coords.xy]
+    coords.reverse()
+    prov_coords[prov_code] = coords
 
 month_dict = {'01': 'Gen', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'Mag', '06': 'Giu',
               '07': 'Lug', '08': 'Ago', '09': 'Set', '10': 'Ott', '11': 'Nov', '12': 'Dec'}
@@ -58,15 +70,18 @@ for r in data[data.denominazione_provincia == temp_label].index:
     data.at[r, 'var'] = np.nan
     data.at[r, 'varper'] = np.nan
 
+data['Latitudine'] = data.apply(lambda loc: prov_coords.get(loc['codice_provincia'],[np.nan])[0], axis=1)
+data['Longitudine'] = data.apply(lambda loc: prov_coords.get(loc['codice_provincia'],[np.nan, np.nan])[1], axis=1)
+
 data = data.rename(columns={'totale_casi': 'Totale casi', 'data': 'Data',
-                            'var': 'Variazione (rispetto al giorno precedente)',
+                            'var': 'Variazione (abs)',
                             'varper': 'Variazione (%)', 'denominazione_regione': 'Regione',
                             'denominazione_provincia': 'Provincia'})
 
-measures = ['Totale casi', 'Variazione (rispetto al giorno precedente)', 'Variazione (%)']
+measures = ['Totale casi', 'Variazione (abs)', 'Variazione (%)']
 
 table_cols = ['Data', 'Regione', 'Provincia', 'Totale casi',
-              'Variazione (rispetto al giorno precedente)', 'Variazione (%)']
+              'Variazione (abs)', 'Variazione (%)']
 
 slider_marks = {int(i): {'label': day, 'style': {'transform': 'rotate(45deg)', 'font-size': '16px'}}
 if (x_max - int(i)) % 3 == 0 else ''
@@ -76,23 +91,7 @@ app.layout = html.Div([html.Div(html.H1('COVID-19 in Italia: i contagi per provi
                        html.Div(dcc.Dropdown(id='selectmeasure',
                                              options=[{'label': i, 'value': i} for i in measures],
                                              value=measures[0]), className='dropdown-container'),
-                       html.Div([html.Div([dcc.Graph(id='prov-choropleth',
-                                                     figure=dict(
-                                                         data=[],
-                                                         layout=dict(
-                                                             mapbox=dict(
-                                                                 layers=[],
-                                                                 style='carto-positron',
-                                                                 center={
-                                                                     'lat': 41.8919,
-                                                                     'lon': 12.5113
-                                                                 },
-                                                                 pitch=0,
-                                                                 zoom=4
-                                                             ),
-                                                             autosize=True,
-                                                             margin=dict(r=0, l=0, t=0, b=0)
-                                                         )))], className='graph'),
+                       html.Div([html.Div([dcc.Graph(id='prov-mapbox')], className='graph'),
                                  html.Div([dcc.Graph(id='plot',
                                                      figure=dict(
                                                          data=[],
@@ -122,37 +121,42 @@ app.layout = html.Div([html.Div(html.H1('COVID-19 in Italia: i contagi per provi
 
 
 @app.callback(
-    [Output('prov-choropleth', 'figure'),
+    [Output('prov-mapbox', 'figure'),
      Output('table', 'data')],
     [Input('date-slider', 'value'),
      Input('selectmeasure', 'value')],
-    [State('prov-choropleth', 'figure')])
+    [State('prov-mapbox', 'figure')])
 def update_figure(selected_date, measure, figure):
     filtered_df = data[data.date_index == selected_date]
-    z_min = filtered_df[filtered_df.Provincia != temp_label][measure].min()
-    z_max = filtered_df[filtered_df.Provincia != temp_label][measure].max()
     table_data = filtered_df.to_dict('rows')
+    filtered_df = filtered_df.dropna(subset=[measure])
+    filtered_df[measure] = filtered_df[measure].abs()
 
-    if figure['data']:
-        figure['data'][0]['z'] = filtered_df[measure]
-        figure['data'][0]['zmin'] = z_min
-        figure['data'][0]['zmax'] = z_max
-        figure['data'][0]['name'] = measure
-
+    if figure:
+        lat = figure["layout"]["mapbox"]["center"]["lat"]
+        lon = figure["layout"]["mapbox"]["center"]["lon"]
+        zoom = figure["layout"]["mapbox"]["zoom"]
     else:
-        trace = go.Choroplethmapbox(z=filtered_df[measure], geojson=prov, locations=filtered_df['codice_provincia'],
-                                    featureidkey='properties.prov_istat_code_num', zmax=z_max, zmin=z_min, name=measure,
-                                    hovertemplate='%{text}<extra>%{z}</extra>',
-                                    text=filtered_df['Provincia'] + "<br>" + filtered_df['Data'])
+        lat = 42
+        lon = 13
+        zoom = 4
 
-        figure['data'] = [trace]
+    figure = px.scatter_mapbox(filtered_df, lat="Latitudine", lon="Longitudine", labels={},
+                               mapbox_style='carto-positron',
+                               hover_name='Provincia', hover_data=[measure], color=measure, size=measure,
+                               color_continuous_scale=px.colors.cyclical.IceFire, size_max=20, zoom=5)
+
+    figure["layout"]["margin"] = dict(r=0, l=0, t=0, b=0)
+    figure["layout"]["mapbox"]["center"]["lat"] = lat
+    figure["layout"]["mapbox"]["center"]["lon"] = lon
+    figure["layout"]["mapbox"]["zoom"] = zoom
 
     return [figure, table_data]
 
 
 @app.callback(
     Output('plot', 'figure'),
-    [Input('prov-choropleth', 'clickData'),
+    [Input('prov-mapbox', 'clickData'),
      Input('plot', 'clickData'),
      Input('selectmeasure', 'value')],
     [State('plot', 'figure')]
@@ -169,9 +173,9 @@ def update_state_click(choro_click, plot_click, measure, plot):
 
     displayed_provs = [p['name'] for p in plot['data']]
     if choro_click is not None:
-        if prov_codename[choro_click['points'][0]['location']] not in displayed_provs and \
-                ctx.triggered[0]['prop_id'].split('.')[0] == 'prov-choropleth':
-            df_prov = data[data.codice_provincia == choro_click['points'][0]['location']].sort_values('date_index')
+        if choro_click['points'][0]['hovertext'] not in displayed_provs and \
+                ctx.triggered[0]['prop_id'].split('.')[0] == 'prov-mapbox':
+            df_prov = data[data.Provincia == choro_click['points'][0]['hovertext']].sort_values('date_index')
             plot['data'].append(
                 dict(x=df_prov['date_labels'], y=df_prov[measure], name=df_prov['Provincia'].tolist()[0]))
             plot['layout']['yaxis'] = dict(range=[0, y_max])

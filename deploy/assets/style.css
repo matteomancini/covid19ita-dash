@@ -1,0 +1,68 @@
+.main{
+    display: flex;
+    flex-direction: column;
+    font-family: "HelveticaNeue", "Helvetica Neue", Helvetica, "Open Sans", Arial, sans-serif;
+    font-size: 18px;
+}
+
+.title{
+    text-align: center;
+    order: 1;
+}
+
+.dropdown-container {
+    display: block;
+    width: 50%;
+    margin-bottom: 5px;
+    order: 2;
+}
+
+.graph-container{
+    width: 100%;
+    order: 3;
+}
+
+.graph{
+    width: 50%;
+    display: inline-block;
+}
+
+.slider-container{
+    width: 50%;
+    margin-top: 5px;
+    margin-bottom: 25px;
+    order: 4;
+}
+
+.table{
+    width: 100%;
+    order: 5;
+    font-size: 14px;
+}
+
+@media only screen and (max-width: 1080px) {
+    h1 {
+        font-size: 48px;
+    }
+
+    .dropdown-container {
+        display: none;
+    }
+
+    .graph {
+        width: 100%;
+    }
+
+    .slider-container{
+        width: 100%;
+        order: 2;
+    }
+
+    .table{
+        display: none;
+    }
+
+    .modebar{
+      display: none;
+    }
+}
