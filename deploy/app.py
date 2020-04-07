@@ -11,6 +11,21 @@ import numpy as np
 from urllib.request import urlopen
 from shapely import geometry
 
+
+def infobox(info):
+    return html.Div(
+        children=[
+            html.Div([
+                html.Div(
+                    className='infobox-content',
+                    children=[
+                        dcc.Markdown(info),
+                    html.Button('Chiudi', id='closebutton', className='infobutton')])],
+        id='infobox',
+        className='infobox',
+        style={'display': 'none'})])
+
+
 app = dash.Dash(__name__)
 
 server = app.server
@@ -22,6 +37,11 @@ with urlopen(geojson_url) as response:
     prov = json.load(response)
 
 data = pd.read_csv(dataset_url)
+
+info = []
+info_file = 'info.md'
+with open(info_file) as file:
+    info = file.read()
 
 prov_coords={}
 for n,p in enumerate(prov['features']):
@@ -43,7 +63,7 @@ data['data'] = [d.split('T')[0] for d in data['data']]
 
 full_dates = data.data.unique()
 full_dates.sort()
-date_labels = [month_dict[f.split("-")[1]] + f.split("-")[2] for f in full_dates]
+date_labels = [month_dict[f.split('-')[1]] + f.split('-')[2] for f in full_dates]
 
 dates = {d: n for n, d in enumerate(full_dates)}
 labels = {d: l for d, l in zip(full_dates, date_labels)}
@@ -88,6 +108,8 @@ if (x_max - int(i)) % 3 == 0 else ''
                 for i, day in zip(data['date_index'].unique(), data['date_labels'].unique())}
 
 app.layout = html.Div([html.Div(html.H1('COVID-19 in Italia: i contagi per provincia'), className='title'),
+                       html.Div(html.Button('Cosa sto vedendo?', id='infobutton', className='infobutton'),
+                                             className='infobutton-container'), infobox(info),
                        html.Div(dcc.Dropdown(id='selectmeasure',
                                              options=[{'label': i, 'value': i} for i in measures],
                                              value=measures[0]), className='dropdown-container'),
@@ -133,23 +155,23 @@ def update_figure(selected_date, measure, figure):
     filtered_df[measure] = filtered_df[measure].abs()
 
     if figure:
-        lat = figure["layout"]["mapbox"]["center"]["lat"]
-        lon = figure["layout"]["mapbox"]["center"]["lon"]
-        zoom = figure["layout"]["mapbox"]["zoom"]
+        lat = figure['layout']['mapbox']['center']['lat']
+        lon = figure['layout']['mapbox']['center']['lon']
+        zoom = figure['layout']['mapbox']['zoom']
     else:
         lat = 42
         lon = 13
         zoom = 4
 
-    figure = px.scatter_mapbox(filtered_df, lat="Latitudine", lon="Longitudine", labels={},
+    figure = px.scatter_mapbox(filtered_df, lat='Latitudine', lon='Longitudine', labels={},
                                mapbox_style='carto-positron',
                                hover_name='Provincia', hover_data=[measure], color=measure, size=measure,
                                color_continuous_scale=px.colors.cyclical.IceFire, size_max=20, zoom=5)
 
-    figure["layout"]["margin"] = dict(r=0, l=0, t=0, b=0)
-    figure["layout"]["mapbox"]["center"]["lat"] = lat
-    figure["layout"]["mapbox"]["center"]["lon"] = lon
-    figure["layout"]["mapbox"]["zoom"] = zoom
+    figure['layout']['margin'] = dict(r=0, l=0, t=0, b=0)
+    figure['layout']['mapbox']['center']['lat'] = lat
+    figure['layout']['mapbox']['center']['lon'] = lon
+    figure['layout']['mapbox']['zoom'] = zoom
 
     return [figure, table_data]
 
@@ -182,6 +204,20 @@ def update_state_click(choro_click, plot_click, measure, plot):
     if plot_click is not None and ctx.triggered[0]['prop_id'].split('.')[0] == 'plot':
         plot['data'].pop(plot_click['points'][0]['curveNumber'])
     return plot
+
+
+@app.callback(Output('infobox', 'style'),
+              [Input('infobutton', 'n_clicks')])
+def show_modal(nclicks):
+    if nclicks is not None and nclicks > 0:
+        return {'display': 'block'}
+    return {'display': 'none'}
+
+
+@app.callback(Output('infobutton', 'n_clicks'),
+              [Input('closebutton', 'n_clicks')])
+def close_modal(nclicks):
+    return 0
 
 
 if __name__ == '__main__':

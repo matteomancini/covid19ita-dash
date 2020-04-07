@@ -1,3 +1,4 @@
+/* general rules */
 .main{
     display: flex;
     flex-direction: column;
@@ -10,16 +11,20 @@
     order: 1;
 }
 
+h1 {
+    margin-bottom: 20px;
+}
+
 .dropdown-container {
     display: block;
     width: 50%;
     margin-bottom: 5px;
-    order: 2;
+    order: 3;
 }
 
 .graph-container{
     width: 100%;
-    order: 3;
+    order: 4;
 }
 
 .graph{
@@ -31,15 +36,59 @@
     width: 50%;
     margin-top: 5px;
     margin-bottom: 25px;
-    order: 4;
+    order: 5;
 }
 
 .table{
     width: 100%;
-    order: 5;
+    order: 6;
     font-size: 14px;
 }
 
+/* infobox */
+.infobutton-container {
+  text-align: center;
+  display: inline-block;
+  order: 2;
+}
+
+.infobutton {
+  font-size: 18px;
+  margin-bottom: 30px;
+  background-color: #e7e7e7;
+  color: black;
+  padding: 9px 18px;
+  text-align: center;
+  text-decoration: none;
+  border: 2px solid #e7e7e7;
+}
+
+.infobutton:hover {
+  background-color:  white;
+}
+
+.infobox {
+  display: none;
+  position: fixed;
+  z-index: 1;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.4);
+}
+
+.infobox-content {
+  text-align: justify;
+  margin: 5% auto;
+  padding: 20px;
+  border: 1px solid #888;
+  width: 60%;
+  background-color: rgb(255,255,255);
+}
+
+/* Smartphones and devices with smaller screens */
 @media only screen and (max-width: 1080px) {
     h1 {
         font-size: 48px;
@@ -55,7 +104,7 @@
 
     .slider-container{
         width: 100%;
-        order: 2;
+        order: 3;
     }
 
     .table{
